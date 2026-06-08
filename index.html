@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>devutils — Developer Utilities</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <style>
+    body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+    textarea { resize: vertical; }
+    .tool-btn { transition: all .15s; }
+    .tool-btn.active { background: #2563eb; color: #fff; }
+    .tool-btn:not(.active) { background: #1e293b; color: #94a3b8; }
+    .tool-btn:not(.active):hover { background: #334155; color: #e2e8f0; }
+    .copy-btn { transition: all .15s; }
+    .copy-btn:hover { background: #334155; }
+    pre { white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 px-6 py-4 flex items-center gap-3">
+    <svg class="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+    </svg>
+    <span class="font-bold text-lg tracking-tight">devutils</span>
+    <span class="text-slate-500 text-sm">Developer Utilities</span>
+  </header>
+
+  <div class="flex h-[calc(100vh-57px)]">
+
+    <!-- Sidebar -->
+    <nav class="w-48 border-r border-slate-800 p-3 flex flex-col gap-1 shrink-0 overflow-y-auto">
+      <p class="text-xs text-slate-600 px-2 pt-1 pb-1 uppercase tracking-wider">Encode / Decode</p>
+      <button onclick="setTool('base64')"    class="tool-btn active text-left px-3 py-2 rounded text-sm" id="btn-base64">Base64</button>
+      <button onclick="setTool('url')"       class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-url">URL Encode</button>
+      <button onclick="setTool('html')"      class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-html">HTML Entities</button>
+      <p class="text-xs text-slate-600 px-2 pt-3 pb-1 uppercase tracking-wider">Format</p>
+      <button onclick="setTool('json')"      class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-json">JSON Format</button>
+      <button onclick="setTool('yaml2json')" class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-yaml2json">YAML → JSON</button>
+      <button onclick="setTool('json2yaml')" class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-json2yaml">JSON → YAML</button>
+      <p class="text-xs text-slate-600 px-2 pt-3 pb-1 uppercase tracking-wider">Hash</p>
+      <button onclick="setTool('hash')"      class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-hash">Hash (SHA)</button>
+      <p class="text-xs text-slate-600 px-2 pt-3 pb-1 uppercase tracking-wider">Text</p>
+      <button onclick="setTool('case')"      class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-case">Case Convert</button>
+      <button onclick="setTool('diff')"      class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-diff">Text Diff</button>
+      <button onclick="setTool('lorem')"     class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-lorem">Lorem Ipsum</button>
+      <p class="text-xs text-slate-600 px-2 pt-3 pb-1 uppercase tracking-wider">Other</p>
+      <button onclick="setTool('uuid')"      class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-uuid">UUID Generate</button>
+      <button onclick="setTool('regex')"     class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-regex">Regex Tester</button>
+      <button onclick="setTool('ts')"        class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-ts">Timestamp</button>
+      <button onclick="setTool('jwt')"       class="tool-btn text-left px-3 py-2 rounded text-sm" id="btn-jwt">JWT Decode</button>
+    </nav>
+
+    <!-- Tool area -->
+    <main class="flex-1 p-6 overflow-y-auto" id="tool-area">
+    </main>
+
+  </div>
+
+<script>
+const LOREM = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.";
+
+let currentTool = 'base64';
+
+function setTool(name) {
+  document.querySelectorAll('.tool-btn').forEach(b => {
+    b.classList.remove('active');
+    b.classList.add('not-active');
+  });
+  const btn = document.getElementById('btn-' + name);
+  if (btn) { btn.classList.add('active'); btn.classList.remove('not-active'); }
+  currentTool = name;
+  renderTool(name);
+}
+
+function ta(id, placeholder='', rows=8, value='') {
+  return `<textarea id="${id}" rows="${rows}"
+    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm font-mono focus:outline-none focus:border-blue-500 placeholder-slate-600"
+    placeholder="${placeholder}">${value}</textarea>`;
+}
+
+function output(id) {
+  return `<div class="relative">
+    <pre id="${id}" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-sm font-mono min-h-[120px] text-slate-200"></pre>
+    <button class="copy-btn absolute top-2 right-2 bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded"
+      onclick="copyEl('${id}')">copy</button>
+  </div>`;
+}
+
+function copyEl(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.innerText || el.value || '');
+}
+
+function label(text) {
+  return `<p class="text-xs text-slate-500 mb-1 mt-3 uppercase tracking-wider">${text}</p>`;
+}
+
+function btnRow(...btns) {
+  return `<div class="flex gap-2 my-3">${btns.join('')}</div>`;
+}
+
+function actionBtn(label, onclick, color='blue') {
+  return `<button onclick="${onclick}"
+    class="bg-${color}-600 hover:bg-${color}-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+    ${label}</button>`;
+}
+
+function heading(title, desc='') {
+  return `<h2 class="text-lg font-semibold mb-1">${title}</h2>
+    ${desc ? `<p class="text-slate-400 text-sm mb-4">${desc}</p>` : '<div class="mb-4"></div>'}`;
+}
+
+// ── Tools ─────────────────────────────────────────────────────────────────────
+
+const tools = {
+
+  base64: () => `
+    ${heading('Base64', 'Encode or decode Base64 strings')}
+    ${label('Input')}${ta('b64-in','Enter text or Base64...')}
+    ${btnRow(
+      actionBtn('Encode →', "b64_encode()"),
+      actionBtn('← Decode', "b64_decode()", 'slate'),
+    )}
+    ${label('Output')}${output('b64-out')}
+    <script>
+    function b64_encode(){try{document.getElementById('b64-out').innerText=btoa(unescape(encodeURIComponent(document.getElementById('b64-in').value)))}catch(e){document.getElementById('b64-out').innerText='Error: '+e.message}}
+    function b64_decode(){try{document.getElementById('b64-out').innerText=decodeURIComponent(escape(atob(document.getElementById('b64-in').value)))}catch(e){document.getElementById('b64-out').innerText='Error: '+e.message}}
+    <\/script>`,
+
+  url: () => `
+    ${heading('URL Encode / Decode')}
+    ${label('Input')}${ta('url-in','https://example.com/path?q=hello world')}
+    ${btnRow(
+      actionBtn('Encode', "url_encode()"),
+      actionBtn('Decode', "url_decode()", 'slate'),
+    )}
+    ${label('Output')}${output('url-out')}
+    <script>
+    function url_encode(){document.getElementById('url-out').innerText=encodeURIComponent(document.getElementById('url-in').value)}
+    function url_decode(){try{document.getElementById('url-out').innerText=decodeURIComponent(document.getElementById('url-in').value)}catch(e){document.getElementById('url-out').innerText='Error: '+e.message}}
+    <\/script>`,
+
+  html: () => `
+    ${heading('HTML Entity Encode / Decode')}
+    ${label('Input')}${ta('html-in','<div class="test">Hello & goodbye</div>')}
+    ${btnRow(
+      actionBtn('Encode', "html_encode()"),
+      actionBtn('Decode', "html_decode()", 'slate'),
+    )}
+    ${label('Output')}${output('html-out')}
+    <script>
+    function html_encode(){const t=document.createElement('textarea');t.innerText=document.getElementById('html-in').value;document.getElementById('html-out').innerText=t.innerHTML}
+    function html_decode(){const t=document.createElement('textarea');t.innerHTML=document.getElementById('html-in').value;document.getElementById('html-out').innerText=t.value}
+    <\/script>`,
+
+  json: () => `
+    ${heading('JSON Formatter', 'Format and validate JSON')}
+    ${label('Input')}${ta('json-in','{"name":"Alice","age":30,"hobbies":["reading","coding"]}')}
+    ${btnRow(
+      actionBtn('Format', "fmt_json(2)"),
+      actionBtn('Compact', "fmt_json(0)", 'slate'),
+      actionBtn('Validate', "validate_json()", 'green'),
+    )}
+    ${label('Output')}${output('json-out')}
+    <script>
+    function fmt_json(spaces){try{const v=JSON.parse(document.getElementById('json-in').value);document.getElementById('json-out').innerText=JSON.stringify(v,null,spaces)}catch(e){document.getElementById('json-out').innerText='Error: '+e.message}}
+    function validate_json(){try{JSON.parse(document.getElementById('json-in').value);document.getElementById('json-out').innerText='✓ Valid JSON'}catch(e){document.getElementById('json-out').innerText='✗ Invalid: '+e.message}}
+    <\/script>`,
+
+  yaml2json: () => `
+    ${heading('YAML → JSON')}
+    ${label('YAML Input')}${ta('y2j-in','name: Alice\nage: 30\nhobbies:\n  - reading\n  - coding')}
+    ${btnRow(actionBtn('Convert', "conv_y2j()"))}
+    ${label('JSON Output')}${output('y2j-out')}
+    <script>
+    function conv_y2j(){try{const d=jsyaml.load(document.getElementById('y2j-in').value);document.getElementById('y2j-out').innerText=JSON.stringify(d,null,2)}catch(e){document.getElementById('y2j-out').innerText='Error: '+e.message}}
+    <\/script>`,
+
+  json2yaml: () => `
+    ${heading('JSON → YAML')}
+    ${label('JSON Input')}${ta('j2y-in','{"name":"Alice","age":30,"hobbies":["reading","coding"]}')}
+    ${btnRow(actionBtn('Convert', "conv_j2y()"))}
+    ${label('YAML Output')}${output('j2y-out')}
+    <script>
+    function conv_j2y(){try{const d=JSON.parse(document.getElementById('j2y-in').value);document.getElementById('j2y-out').innerText=jsyaml.dump(d)}catch(e){document.getElementById('j2y-out').innerText='Error: '+e.message}}
+    <\/script>`,
+
+  hash: () => `
+    ${heading('Hash Generator', 'SHA-1, SHA-256, SHA-512 via WebCrypto')}
+    ${label('Input')}${ta('hash-in','Enter text to hash...', 4)}
+    ${btnRow(
+      actionBtn('SHA-256', "do_hash('SHA-256')"),
+      actionBtn('SHA-512', "do_hash('SHA-512')", 'slate'),
+      actionBtn('SHA-1', "do_hash('SHA-1')", 'slate'),
+    )}
+    ${label('Output')}${output('hash-out')}
+    <script>
+    async function do_hash(alg){
+      const data=new TextEncoder().encode(document.getElementById('hash-in').value);
+      const buf=await crypto.subtle.digest(alg,data);
+      const hex=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+      document.getElementById('hash-out').innerText=alg+': '+hex;
+    }
+    <\/script>`,
+
+  case: () => `
+    ${heading('Case Converter')}
+    ${label('Input')}${ta('case-in','hello world from devutils')}
+    ${btnRow(
+      actionBtn('UPPER', "conv_case('upper')"),
+      actionBtn('lower', "conv_case('lower')", 'slate'),
+      actionBtn('Title', "conv_case('title')", 'slate'),
+      actionBtn('camelCase', "conv_case('camel')", 'slate'),
+    )}
+    ${btnRow(
+      actionBtn('snake_case', "conv_case('snake')", 'slate'),
+      actionBtn('kebab-case', "conv_case('kebab')", 'slate'),
+      actionBtn('PascalCase', "conv_case('pascal')", 'slate'),
+    )}
+    ${label('Output')}${output('case-out')}
+    <script>
+    function conv_case(type){
+      const v=document.getElementById('case-in').value;
+      const words=v.replace(/[_\\-]+/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').toLowerCase().split(/\\s+/);
+      let r;
+      if(type==='upper') r=v.toUpperCase();
+      else if(type==='lower') r=v.toLowerCase();
+      else if(type==='title') r=words.map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+      else if(type==='camel') r=words.map((w,i)=>i===0?w:w.charAt(0).toUpperCase()+w.slice(1)).join('');
+      else if(type==='snake') r=words.join('_');
+      else if(type==='kebab') r=words.join('-');
+      else if(type==='pascal') r=words.map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join('');
+      document.getElementById('case-out').innerText=r;
+    }
+    <\/script>`,
+
+  diff: () => `
+    ${heading('Text Diff', 'Compare two texts line by line')}
+    <div class="grid grid-cols-2 gap-3">
+      <div>${label('Text A')}${ta('diff-a','foo\nbar\nbaz',8)}</div>
+      <div>${label('Text B')}${ta('diff-b','foo\nqux\nbaz',8)}</div>
+    </div>
+    ${btnRow(actionBtn('Compare', "do_diff()"))}
+    ${label('Result')}
+    <div id="diff-out" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 font-mono text-sm min-h-[80px]"></div>
+    <script>
+    function do_diff(){
+      const a=document.getElementById('diff-a').value.split('\\n');
+      const b=document.getElementById('diff-b').value.split('\\n');
+      const max=Math.max(a.length,b.length);
+      let html='';
+      for(let i=0;i<max;i++){
+        const la=a[i]??'';const lb=b[i]??'';
+        if(la===lb) html+=\`<div class="text-slate-400">&nbsp;&nbsp;${escHtml(la)}</div>\`;
+        else{
+          if(la) html+=\`<div class="text-red-400 bg-red-950/30">- ${escHtml(la)}</div>\`;
+          if(lb) html+=\`<div class="text-green-400 bg-green-950/30">+ ${escHtml(lb)}</div>\`;
+        }
+      }
+      document.getElementById('diff-out').innerHTML=html||'<span class="text-slate-500">No differences</span>';
+    }
+    function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+    <\/script>`,
+
+  lorem: () => `
+    ${heading('Lorem Ipsum Generator')}
+    <div class="flex gap-3 items-end">
+      <div>
+        ${label('Paragraphs')}
+        <input id="lorem-n" type="number" value="3" min="1" max="20"
+          class="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"/>
+      </div>
+      ${actionBtn('Generate', "gen_lorem()")}
+    </div>
+    ${label('Output')}${output('lorem-out')}
+    <script>
+    const LOREM_S="${LOREM}";
+    function gen_lorem(){
+      const n=parseInt(document.getElementById('lorem-n').value)||3;
+      document.getElementById('lorem-out').innerText=Array(n).fill(LOREM_S).join('\\n\\n');
+    }
+    gen_lorem();
+    <\/script>`,
+
+  uuid: () => `
+    ${heading('UUID Generator')}
+    <div class="flex gap-3 items-end">
+      <div>
+        ${label('Count')}
+        <input id="uuid-n" type="number" value="5" min="1" max="50"
+          class="w-24 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"/>
+      </div>
+      ${actionBtn('Generate', "gen_uuid()")}
+    </div>
+    ${label('UUIDs')}${output('uuid-out')}
+    <script>
+    function gen_uuid(){
+      const n=parseInt(document.getElementById('uuid-n').value)||5;
+      const ids=Array.from({length:n},()=>crypto.randomUUID());
+      document.getElementById('uuid-out').innerText=ids.join('\\n');
+    }
+    gen_uuid();
+    <\/script>`,
+
+  regex: () => `
+    ${heading('Regex Tester')}
+    <div class="flex gap-2">
+      <div class="flex-1">
+        ${label('Pattern')}
+        <input id="rx-pattern" type="text" placeholder="[a-z]+" value="\\b\\w{4}\\b"
+          class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+      </div>
+      <div>
+        ${label('Flags')}
+        <input id="rx-flags" type="text" placeholder="gi" value="gi"
+          class="w-20 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+      </div>
+    </div>
+    ${label('Test String')}
+    ${ta('rx-text','The quick brown fox jumps over the lazy dog.', 4)}
+    ${btnRow(actionBtn('Test', "do_regex()"))}
+    <div id="rx-status" class="text-sm mb-2"></div>
+    ${label('Highlighted')}
+    <div id="rx-out" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 font-mono text-sm min-h-[60px] break-all"></div>
+    <script>
+    function do_regex(){
+      const pat=document.getElementById('rx-pattern').value;
+      const flags=document.getElementById('rx-flags').value;
+      const text=document.getElementById('rx-text').value;
+      try{
+        const rx=new RegExp(pat,flags);
+        const matches=[...text.matchAll(new RegExp(pat,flags.includes('g')?flags:flags+'g'))];
+        document.getElementById('rx-status').innerHTML=\`<span class="text-green-400">✓ ${matches.length} match${matches.length!==1?'es':''}</span>\`;
+        const highlighted=text.replace(new RegExp(pat,flags.includes('g')?flags:flags+'g'),
+          m=>\`<mark class="bg-yellow-500/40 text-yellow-200 rounded px-0.5">${escHtml2(m)}</mark>\`);
+        document.getElementById('rx-out').innerHTML=escHtml2(text).replace(
+          new RegExp(escHtml2(pat).replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&'),flags),
+          m=>\`<mark class="bg-yellow-500/40 text-yellow-200 rounded px-0.5">\${m}</mark>\`
+        );
+        // simpler approach
+        document.getElementById('rx-out').innerHTML=text.replace(
+          new RegExp(pat,flags.includes('g')?flags:flags+'g'),
+          m=>\`<mark class="bg-yellow-500/40 text-yellow-200 rounded px-0.5">\${m.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</mark>\`
+        ).replace(/\\n/g,'<br>');
+      }catch(e){
+        document.getElementById('rx-status').innerHTML=\`<span class="text-red-400">✗ \${e.message}</span>\`;
+        document.getElementById('rx-out').innerText='';
+      }
+    }
+    function escHtml2(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+    do_regex();
+    <\/script>`,
+
+  ts: () => `
+    ${heading('Timestamp Converter')}
+    <div class="flex gap-3 items-end">
+      <div class="flex-1">
+        ${label('Unix Timestamp (seconds)')}
+        <input id="ts-in" type="number" value="${Math.floor(Date.now()/1000)}"
+          class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500"/>
+      </div>
+      ${actionBtn('Convert', "conv_ts()")}
+    </div>
+    ${label('Result')}
+    <div id="ts-out" class="bg-slate-900 border border-slate-700 rounded-xl divide-y divide-slate-800"></div>
+    ${btnRow(actionBtn('Now', "set_now()", 'slate'))}
+    <script>
+    function ts_row(label,value){return \`<div class="flex justify-between px-4 py-2.5 text-sm"><span class="text-slate-400">\${label}</span><span class="font-mono">\${value}</span></div>\`}
+    function conv_ts(){
+      const ts=parseInt(document.getElementById('ts-in').value);
+      if(isNaN(ts)){document.getElementById('ts-out').innerHTML='<div class="px-4 py-3 text-red-400 text-sm">Invalid timestamp</div>';return}
+      const d=new Date(ts*1000);
+      document.getElementById('ts-out').innerHTML=[
+        ts_row('UTC',d.toUTCString()),
+        ts_row('ISO 8601',d.toISOString()),
+        ts_row('Local',d.toLocaleString()),
+        ts_row('Date only',d.toISOString().split('T')[0]),
+        ts_row('Relative',timeAgo(ts)),
+      ].join('');
+    }
+    function timeAgo(ts){
+      const diff=Math.floor(Date.now()/1000)-ts;
+      if(Math.abs(diff)<60) return Math.abs(diff)+'s '+(diff>0?'ago':'from now');
+      if(Math.abs(diff)<3600) return Math.floor(Math.abs(diff)/60)+'m '+(diff>0?'ago':'from now');
+      if(Math.abs(diff)<86400) return Math.floor(Math.abs(diff)/3600)+'h '+(diff>0?'ago':'from now');
+      return Math.floor(Math.abs(diff)/86400)+'d '+(diff>0?'ago':'from now');
+    }
+    function set_now(){document.getElementById('ts-in').value=Math.floor(Date.now()/1000);conv_ts()}
+    conv_ts();
+    <\/script>`,
+
+  jwt: () => `
+    ${heading('JWT Decoder', 'Decode JWT tokens (client-side only, no verification)')}
+    ${label('JWT Token')}
+    ${ta('jwt-in','Paste your JWT here...', 4)}
+    ${btnRow(actionBtn('Decode', "decode_jwt()"))}
+    <div class="grid grid-cols-2 gap-3">
+      <div>${label('Header')}${output('jwt-header')}</div>
+      <div>${label('Payload')}${output('jwt-payload')}</div>
+    </div>
+    <div id="jwt-exp" class="mt-2 text-sm"></div>
+    <script>
+    function decode_jwt(){
+      const token=document.getElementById('jwt-in').value.trim();
+      const parts=token.split('.');
+      if(parts.length<2){document.getElementById('jwt-header').innerText='Invalid JWT';return}
+      try{
+        const header=JSON.parse(atob(parts[0].replace(/-/g,'+').replace(/_/g,'/')));
+        const payload=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+        document.getElementById('jwt-header').innerText=JSON.stringify(header,null,2);
+        document.getElementById('jwt-payload').innerText=JSON.stringify(payload,null,2);
+        if(payload.exp){
+          const exp=new Date(payload.exp*1000);
+          const expired=Date.now()>payload.exp*1000;
+          document.getElementById('jwt-exp').innerHTML=expired
+            ?'<span class="text-red-400">✗ Expired: '+exp.toLocaleString()+'</span>'
+            :'<span class="text-green-400">✓ Valid until: '+exp.toLocaleString()+'</span>';
+        }
+      }catch(e){document.getElementById('jwt-header').innerText='Error: '+e.message}
+    }
+    <\/script>`,
+};
+
+function renderTool(name) {
+  const fn = tools[name];
+  if (!fn) return;
+  document.getElementById('tool-area').innerHTML = fn();
+}
+
+renderTool('base64');
+</script>
+
+</body>
+</html>
