@@ -429,7 +429,14 @@ const tools = {
 function renderTool(name) {
   const fn = tools[name];
   if (!fn) return;
-  document.getElementById('tool-area').innerHTML = fn();
+  const area = document.getElementById('tool-area');
+  area.innerHTML = fn();
+  // Scripts injected via innerHTML are not executed by browsers — re-run them manually
+  area.querySelectorAll('script').forEach(old => {
+    const s = document.createElement('script');
+    s.textContent = old.textContent;
+    old.replaceWith(s);
+  });
 }
 
 renderTool('base64');
